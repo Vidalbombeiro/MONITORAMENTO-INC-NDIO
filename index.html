@@ -1,0 +1,1318 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitoramento de Incêndios - Ibitinga, Araraquara e São Carlos</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* ===== ESTILOS ===== */
+        :root {
+            --bg-color: #1e1e2f;
+            --panel-bg: #2a2a40;
+            --text-color: #e0e0e0;
+            --accent-green: #4caf50;
+            --accent-red: #f44336;
+            --accent-yellow: #ff9800;
+            --accent-orange: #ff6f00;
+            --accent-blue: #2196F3;
+            --border-radius: 8px;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+            width: 100%;
+            max-width: 1200px;
+        }
+
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .cidades-badge {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .cidade-badge {
+            background: var(--panel-bg);
+            padding: 6px 15px;
+            border-radius: 20px;
+            font-size: 13px;
+            border: 2px solid #4caf50;
+            color: #4caf50;
+        }
+
+        .cidade-badge.active {
+            border-color: var(--accent-red);
+            color: var(--accent-red);
+            animation: pulse-border 0.5s infinite;
+        }
+
+        h1 {
+            margin: 10px 0;
+            font-size: 24px;
+            color: #fff;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .status-banner {
+            background-color: var(--accent-green);
+            color: white;
+            padding: 15px;
+            border-radius: var(--border-radius);
+            font-weight: bold;
+            font-size: 20px;
+            margin-top: 10px;
+            transition: background-color 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .status-banner.alert {
+            background-color: var(--accent-red);
+            animation: blink 0.5s infinite;
+        }
+
+        .status-banner .alert-icon {
+            font-size: 30px;
+            animation: pulse 0.5s infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.3); }
+        }
+
+        @keyframes pulse-border {
+            0%, 100% { border-color: var(--accent-red); }
+            50% { border-color: #ff1744; }
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            width: 100%;
+            max-width: 1200px;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background-color: var(--panel-bg);
+            padding: 20px;
+            border-radius: var(--border-radius);
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            transition: all 0.3s;
+        }
+
+        .card.alert-card {
+            border: 2px solid var(--accent-red);
+            animation: pulse-border 0.5s infinite;
+        }
+
+        .card h3 {
+            margin: 0 0 10px 0;
+            font-size: 16px;
+            color: #aaa;
+        }
+
+        .card .value {
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        .map-container {
+            background-color: var(--panel-bg);
+            padding: 20px;
+            border-radius: var(--border-radius);
+            width: 100%;
+            max-width: 1200px;
+            box-sizing: border-box;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .log-panel {
+            width: 100%;
+            max-width: 1200px;
+            background-color: var(--panel-bg);
+            padding: 20px;
+            border-radius: var(--border-radius);
+            margin-top: 20px;
+            box-sizing: border-box;
+            height: 150px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 13px;
+        }
+
+        .log-entry {
+            margin: 5px 0;
+            border-bottom: 1px solid #444;
+            padding-bottom: 5px;
+        }
+
+        .btn-dispatch {
+            background-color: var(--accent-red);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            display: none;
+            transition: all 0.3s;
+            animation: pulse-btn 1s infinite;
+        }
+
+        @keyframes pulse-btn {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .btn-dispatch:hover {
+            transform: scale(1.1);
+            opacity: 0.9;
+        }
+
+        .btn-dispatch:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+            animation: none;
+        }
+
+        .btn-report {
+            background-color: var(--accent-blue);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-report:hover {
+            transform: scale(1.05);
+            opacity: 0.9;
+        }
+
+        .btn-sound {
+            background-color: #9c27b0;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-sound:hover {
+            transform: scale(1.05);
+            opacity: 0.9;
+        }
+
+        .btn-sound.silent {
+            background-color: #666;
+        }
+
+        .btn-firms {
+            background-color: #ff6f00;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: none;
+        }
+
+        .btn-firms:hover {
+            transform: scale(1.05);
+            opacity: 0.9;
+        }
+
+        .btn-firms.active {
+            display: inline-block;
+            animation: pulse-btn 1s infinite;
+        }
+
+        .btn-firms.ibitinga { background-color: #e65100; }
+        .btn-firms.araraquara { background-color: #bf360c; }
+        .btn-firms.saocarlos { background-color: #4e342e; }
+
+        .chart-container {
+            width: 100%;
+            max-width: 1200px;
+            background-color: var(--panel-bg);
+            padding: 20px;
+            border-radius: var(--border-radius);
+            margin: 20px 0;
+        }
+
+        .config-panel {
+            background-color: var(--panel-bg);
+            padding: 20px;
+            border-radius: var(--border-radius);
+            width: 100%;
+            max-width: 1200px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .config-panel label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #aaa;
+        }
+
+        .config-panel input {
+            background: #1e1e2f;
+            border: 1px solid #444;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            width: 70px;
+        }
+
+        .config-panel button {
+            background-color: var(--accent-green);
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .cidades-container {
+            background: var(--panel-bg);
+            padding: 15px;
+            border-radius: var(--border-radius);
+            width: 100%;
+            max-width: 1200px;
+            margin-top: 10px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 15px;
+        }
+
+        .cidade-card {
+            background: #1e1e2f;
+            padding: 15px;
+            border-radius: var(--border-radius);
+            border-left: 4px solid #4caf50;
+            transition: all 0.3s;
+        }
+
+        .cidade-card.alert {
+            border-left-color: var(--accent-red);
+            background: #2a1a1a;
+        }
+
+        .cidade-card h4 {
+            margin: 0 0 10px 0;
+            color: #fff;
+            font-size: 16px;
+        }
+
+        .cidade-card .dados {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 5px;
+            font-size: 14px;
+            color: #aaa;
+        }
+
+        .cidade-card .dados .label {
+            color: #666;
+        }
+
+        .cidade-card .status-indicator {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-top: 8px;
+        }
+
+        .cidade-card .status-indicator.normal {
+            background: #1b5e20;
+            color: #4caf50;
+        }
+
+        .cidade-card .status-indicator.alerta {
+            background: #b71c1c;
+            color: #ff1744;
+            animation: pulse 0.5s infinite;
+        }
+
+        .sensor-list {
+            background: var(--panel-bg);
+            padding: 15px;
+            border-radius: var(--border-radius);
+            width: 100%;
+            max-width: 1200px;
+            margin-top: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .sensor-item {
+            padding: 5px 0;
+            border-bottom: 1px solid #444;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .sound-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        /* Responsividade */
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr 1fr;
+                gap: 10px;
+            }
+            
+            .card {
+                padding: 12px;
+            }
+            
+            .card .value {
+                font-size: 20px;
+            }
+            
+            .map-container {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .btn-dispatch, .btn-report, .btn-sound, .btn-firms {
+                width: 100%;
+                padding: 15px;
+                font-size: 14px;
+            }
+            
+            .log-panel {
+                height: 200px;
+                font-size: 12px;
+            }
+            
+            header h1 {
+                font-size: 18px;
+            }
+            
+            .status-banner {
+                font-size: 16px;
+                padding: 12px;
+            }
+
+            .config-panel {
+                flex-direction: column;
+            }
+
+            .sound-control {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .btn-group {
+                width: 100%;
+            }
+
+            .cidades-container {
+                grid-template-columns: 1fr;
+            }
+
+            .cidade-card .dados {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .dashboard {
+                grid-template-columns: 1fr 1fr;
+                gap: 8px;
+            }
+            
+            .card h3 {
+                font-size: 12px;
+            }
+            
+            .card .value {
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="header-top">
+            <div class="cidades-badge">
+                <span class="cidade-badge" id="badgeIbitinga">📍 Ibitinga</span>
+                <span class="cidade-badge" id="badgeAraraquara">📍 Araraquara</span>
+                <span class="cidade-badge" id="badgeSaoCarlos">📍 São Carlos</span>
+            </div>
+        </div>
+        <h1>🔥 Monitoramento de Incêndios - Ibitinga, Araraquara e São Carlos</h1>
+        <div id="statusBanner" class="status-banner">
+            <span>✅ STATUS: MONITORAMENTO NORMAL</span>
+        </div>
+    </header>
+
+    <div class="config-panel">
+        <label>🌡️ Temp Alerta: <input type="number" id="tempAlerta" value="45" step="0.5"></label>
+        <label>💨 Gás Alerta: <input type="number" id="gasAlerta" value="400" step="10"></label>
+        <button onclick="salvarConfiguracoes()">💾 Salvar</button>
+        <button onclick="reiniciarSimulacao()" style="background-color: var(--accent-yellow);">🔄 Reiniciar</button>
+        <div class="sound-control">
+            <button id="btnSoundToggle" class="btn-sound" onclick="toggleSound()">🔊 Áudio: LIGADO</button>
+            <button onclick="testarAlertaSonoro()" style="background-color: #ff6f00; padding: 8px 15px; border: none; border-radius: 4px; color: white; cursor: pointer;">🔔 Testar Alerta</button>
+        </div>
+    </div>
+
+    <div class="dashboard">
+        <div class="card" id="cardTemp">
+            <h3>🌡️ Temperatura (BME280)</h3>
+            <div class="value" id="valTemp">28.0 °C</div>
+        </div>
+        <div class="card" id="cardHum">
+            <h3>💧 Umidade (BME280)</h3>
+            <div class="value" id="valHum">55 %</div>
+        </div>
+        <div class="card" id="cardGas">
+            <h3>💨 Gás/Fumaça (MQ-2)</h3>
+            <div class="value" id="valGas">120 PPM</div>
+        </div>
+        <div class="card" id="cardFlame">
+            <h3>🔥 Infravermelho (KY-026)</h3>
+            <div class="value" id="valFlame">NENHUM</div>
+        </div>
+    </div>
+
+    <div class="cidades-container" id="cidadesContainer">
+        <!-- Cards das cidades serão gerados pelo JavaScript -->
+    </div>
+
+    <div class="chart-container">
+        <canvas id="graficoSensores"></canvas>
+    </div>
+
+    <div class="map-container">
+        <div>
+            <h3 style="margin-top:0; color:#aaa;">📍 Localização do Nó Sensor (GPS)</h3>
+            <div class="value" style="font-size: 20px;" id="valGPS">Lat: -21.7600, Lon: -48.8300</div>
+            <p style="font-size: 12px; color: #888;" id="localizacaoAtual">Setor: Área Central - Região</p>
+        </div>
+        <div class="btn-group">
+            <button id="btnDispatch" class="btn-dispatch" onclick="despacharViatura()">🚒 GERAR ROTA DE DESPACHO</button>
+            <button id="btnFirms" class="btn-firms" onclick="abrirFIRMS()">🛰️ VER NASA FIRMS</button>
+            <button class="btn-report" onclick="gerarRelatorio()">📊 GERAR RELATÓRIO</button>
+        </div>
+    </div>
+
+    <div class="sensor-list" id="listaSensores">
+        <strong>📡 Sensores Ativos:</strong>
+    </div>
+
+    <div class="log-panel" id="logPanel">
+        <div style="color: #aaa;">-- Log de Recepção de Dados (Simulação LoRa) --</div>
+    </div>
+
+    <script>
+        // ============================================
+        // CONFIGURAÇÕES DAS CIDADES
+        // ============================================
+        const CIDADES = {
+            ibitinga: {
+                nome: 'Ibitinga',
+                lat: '-21.7600',
+                lon: '-48.8300',
+                urlFirms: 'https://firms.modaps.eosdis.nasa.gov/map/?utm_source=homescreen#d:24hrs;@-48.8300,-21.7600,12.0z',
+                sensorAtivo: false,
+                temperatura: 28,
+                gas: 120,
+                chama: false,
+                alerta: false
+            },
+            araraquara: {
+                nome: 'Araraquara',
+                lat: '-21.7945',
+                lon: '-48.1760',
+                urlFirms: 'https://firms.modaps.eosdis.nasa.gov/map/?utm_source=homescreen#d:24hrs;@-48.1760,-21.7945,12.0z',
+                sensorAtivo: false,
+                temperatura: 28,
+                gas: 120,
+                chama: false,
+                alerta: false
+            },
+            saocarlos: {
+                nome: 'São Carlos',
+                lat: '-22.0174',
+                lon: '-47.8861',
+                urlFirms: 'https://firms.modaps.eosdis.nasa.gov/map/?utm_source=homescreen#d:24hrs;@-47.8861,-22.0174,12.0z',
+                sensorAtivo: false,
+                temperatura: 28,
+                gas: 120,
+                chama: false,
+                alerta: false
+            }
+        };
+
+        // ============================================
+        // CONFIGURAÇÕES GERAIS
+        // ============================================
+        const CONFIG = {
+            TEMP_MIN: -10,
+            TEMP_MAX: 80,
+            TEMP_ALERTA: 45.0,
+            GAS_ALERTA: 400,
+            INTERVALO_ATUALIZACAO: 3000
+        };
+
+        // ============================================
+        // VARIÁVEIS GLOBAIS
+        // ============================================
+        let simulationInterval;
+        let isEmergency = false;
+        let cidadeEmAlerta = null;
+        let ciclo = 0;
+        const sensores = new Map();
+        let graficoSensores = null;
+        let audioContext = null;
+        let alarmInterval = null;
+        let soundEnabled = true;
+        let dadosHistoricos = [];
+
+        // ============================================
+        // ELEMENTOS DOM
+        // ============================================
+        const statusBanner = document.getElementById('statusBanner');
+        const valTemp = document.getElementById('valTemp');
+        const valHum = document.getElementById('valHum');
+        const valGas = document.getElementById('valGas');
+        const valFlame = document.getElementById('valFlame');
+        const valGPS = document.getElementById('valGPS');
+        const localizacaoAtual = document.getElementById('localizacaoAtual');
+        const logPanel = document.getElementById('logPanel');
+        const btnDispatch = document.getElementById('btnDispatch');
+        const btnFirms = document.getElementById('btnFirms');
+        const tempAlertaInput = document.getElementById('tempAlerta');
+        const gasAlertaInput = document.getElementById('gasAlerta');
+        const btnSoundToggle = document.getElementById('btnSoundToggle');
+        const cidadesContainer = document.getElementById('cidadesContainer');
+
+        // ============================================
+        // SISTEMA DE ÁUDIO
+        // ============================================
+        function iniciarAudioContext() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+            return audioContext;
+        }
+
+        function tocarSirene() {
+            if (!soundEnabled) return;
+            
+            try {
+                const ctx = iniciarAudioContext();
+                pararSirene();
+                
+                const osc1 = ctx.createOscillator();
+                const osc2 = ctx.createOscillator();
+                const gainNode = ctx.createGain();
+                const gainNode2 = ctx.createGain();
+                
+                osc1.type = 'sawtooth';
+                osc2.type = 'square';
+                
+                osc1.frequency.setValueAtTime(600, ctx.currentTime);
+                osc2.frequency.setValueAtTime(800, ctx.currentTime);
+                
+                osc1.frequency.exponentialRampToValueAtTime(900, ctx.currentTime + 0.5);
+                osc1.frequency.exponentialRampToValueAtTime(600, ctx.currentTime + 1);
+                osc2.frequency.exponentialRampToValueAtTime(1000, ctx.currentTime + 0.5);
+                osc2.frequency.exponentialRampToValueAtTime(800, ctx.currentTime + 1);
+                
+                gainNode.gain.setValueAtTime(0.3, ctx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.1, ctx.currentTime + 0.1);
+                
+                gainNode2.gain.setValueAtTime(0.2, ctx.currentTime);
+                gainNode2.gain.exponentialRampToValueAtTime(0.05, ctx.currentTime + 0.1);
+                
+                osc1.connect(gainNode);
+                osc2.connect(gainNode2);
+                gainNode.connect(ctx.destination);
+                gainNode2.connect(ctx.destination);
+                
+                osc1.start(ctx.currentTime);
+                osc2.start(ctx.currentTime);
+                
+                let count = 0;
+                alarmInterval = setInterval(() => {
+                    if (!soundEnabled || !isEmergency) {
+                        pararSirene();
+                        return;
+                    }
+                    
+                    count++;
+                    const time = ctx.currentTime;
+                    
+                    if (count % 2 === 0) {
+                        osc1.frequency.exponentialRampToValueAtTime(900, time + 0.3);
+                        osc2.frequency.exponentialRampToValueAtTime(1000, time + 0.3);
+                    } else {
+                        osc1.frequency.exponentialRampToValueAtTime(600, time + 0.3);
+                        osc2.frequency.exponentialRampToValueAtTime(800, time + 0.3);
+                    }
+                    
+                    gainNode.gain.setValueAtTime(0.3, time);
+                    gainNode.gain.exponentialRampToValueAtTime(0.15, time + 0.2);
+                    gainNode.gain.exponentialRampToValueAtTime(0.3, time + 0.4);
+                    
+                }, 500);
+                
+                setTimeout(() => {
+                    if (isEmergency) {
+                        pararSirene();
+                        if (isEmergency && soundEnabled) {
+                            tocarSirene();
+                        }
+                    }
+                }, 30000);
+                
+            } catch (e) {
+                console.error('Erro ao tocar sirene:', e);
+            }
+        }
+
+        function pararSirene() {
+            if (alarmInterval) {
+                clearInterval(alarmInterval);
+                alarmInterval = null;
+            }
+            
+            if (audioContext) {
+                try {
+                    audioContext.close();
+                    audioContext = null;
+                } catch (e) {
+                    console.log('Erro ao parar áudio:', e);
+                }
+            }
+        }
+
+        function testarAlertaSonoro() {
+            addLog('🔔 Testando alerta sonoro...');
+            const wasEmergency = isEmergency;
+            isEmergency = true;
+            soundEnabled = true;
+            tocarSirene();
+            
+            setTimeout(() => {
+                pararSirene();
+                isEmergency = wasEmergency;
+                if (!wasEmergency) {
+                    addLog('🔇 Teste de alerta concluído');
+                }
+            }, 3000);
+        }
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            btnSoundToggle.textContent = soundEnabled ? '🔊 Áudio: LIGADO' : '🔇 Áudio: DESLIGADO';
+            btnSoundToggle.className = `btn-sound${soundEnabled ? '' : ' silent'}`;
+            
+            if (!soundEnabled) {
+                pararSirene();
+                addLog('🔇 Áudio desativado');
+            } else {
+                addLog('🔊 Áudio ativado');
+                if (isEmergency) {
+                    tocarSirene();
+                }
+            }
+        }
+
+        // ============================================
+        // FUNÇÕES FIRMS
+        // ============================================
+        function abrirFIRMS() {
+            if (cidadeEmAlerta && CIDADES[cidadeEmAlerta]) {
+                const cidade = CIDADES[cidadeEmAlerta];
+                addLog(`🛰️ Abrindo NASA FIRMS para ${cidade.nome}...`);
+                window.open(cidade.urlFirms, '_blank');
+            } else {
+                // Abrir mapa geral da região
+                addLog('🛰️ Abrindo NASA FIRMS para a região...');
+                window.open('https://firms.modaps.eosdis.nasa.gov/map/?utm_source=homescreen#d:24hrs;@-48.5000,-21.7000,9.0z', '_blank');
+            }
+        }
+
+        // ============================================
+        // FUNÇÕES DE LOG
+        // ============================================
+        function addLog(mensagem, isAlert = false) {
+            const time = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry';
+            logEntry.style.color = isAlert ? '#f44336' : '#888';
+            logEntry.style.fontWeight = isAlert ? 'bold' : 'normal';
+            
+            const icon = isAlert ? '🔴' : '📝';
+            logEntry.innerText = `[${time}] ${icon} ${mensagem}`;
+            logPanel.prepend(logEntry);
+            
+            while (logPanel.children.length > 100) {
+                logPanel.removeChild(logPanel.lastChild);
+            }
+        }
+
+        // ============================================
+        // ATUALIZAR CARDS DAS CIDADES
+        // ============================================
+        function atualizarCardsCidades() {
+            cidadesContainer.innerHTML = '';
+            
+            Object.keys(CIDADES).forEach(key => {
+                const cidade = CIDADES[key];
+                const card = document.createElement('div');
+                card.className = `cidade-card${cidade.alerta ? ' alert' : ''}`;
+                card.id = `cardCidade_${key}`;
+                
+                const statusClass = cidade.alerta ? 'alerta' : 'normal';
+                const statusText = cidade.alerta ? '🚨 ALERTA' : '✅ NORMAL';
+                
+                card.innerHTML = `
+                    <h4>📍 ${cidade.nome}</h4>
+                    <div class="dados">
+                        <span><span class="label">🌡️ Temperatura:</span> ${cidade.temperatura.toFixed(1)}°C</span>
+                        <span><span class="label">💨 Gás:</span> ${cidade.gas} PPM</span>
+                        <span><span class="label">🔥 Chama:</span> ${cidade.chama ? 'DETECTADA' : 'NENHUMA'}</span>
+                        <span><span class="label">📡 Status:</span> ${cidade.sensorAtivo ? 'Ativo' : 'Inativo'}</span>
+                    </div>
+                    <span class="status-indicator ${statusClass}">${statusText}</span>
+                `;
+                
+                cidadesContainer.appendChild(card);
+            });
+        }
+
+        // ============================================
+        // ATUALIZAR BADGES
+        // ============================================
+        function atualizarBadges() {
+            Object.keys(CIDADES).forEach(key => {
+                const badge = document.getElementById(`badge${key.charAt(0).toUpperCase() + key.slice(1)}`);
+                if (badge) {
+                    if (CIDADES[key].alerta) {
+                        badge.className = 'cidade-badge active';
+                    } else {
+                        badge.className = 'cidade-badge';
+                    }
+                }
+            });
+        }
+
+        // ============================================
+        // PROCESSAMENTO DE DADOS DOS SENSORES
+        // ============================================
+        function processarDadosSensores(dados, cidadeKey) {
+            // Atualizar dados da cidade
+            const cidade = CIDADES[cidadeKey];
+            if (!cidade) return;
+            
+            cidade.temperatura = dados.temperatura;
+            cidade.gas = dados.gas;
+            cidade.chama = dados.chamaDetectada;
+            cidade.sensorAtivo = true;
+            
+            // Verificar alerta
+            const tempAlerta = parseFloat(tempAlertaInput.value) || CONFIG.TEMP_ALERTA;
+            const gasAlerta = parseInt(gasAlertaInput.value) || CONFIG.GAS_ALERTA;
+            
+            const novoAlerta = dados.chamaDetectada || (dados.temperatura > tempAlerta && dados.gas > gasAlerta);
+            
+            if (novoAlerta && !cidade.alerta) {
+                cidade.alerta = true;
+                addLog(`🚨 ALERTA em ${cidade.nome}! Temp: ${dados.temperatura.toFixed(1)}°C, Gás: ${dados.gas}PPM`, true);
+                
+                // Se for o primeiro alerta, ativar emergência geral
+                if (!isEmergency) {
+                    isEmergency = true;
+                    cidadeEmAlerta = cidadeKey;
+                    
+                    statusBanner.innerHTML = `
+                        <span class="alert-icon">🚨</span>
+                        <span>ALERTA: INCÊNDIO DETECTADO EM ${cidade.nome.toUpperCase()}!</span>
+                        <span class="alert-icon">🚨</span>
+                    `;
+                    statusBanner.className = "status-banner alert";
+                    btnDispatch.style.display = "block";
+                    btnFirms.className = `btn-firms active btn-firms ${cidadeKey}`;
+                    
+                    if (soundEnabled) {
+                        tocarSirene();
+                    }
+                    
+                    // Atualizar GPS
+                    valGPS.innerText = `Lat: ${cidade.lat}, Lon: ${cidade.lon}`;
+                    localizacaoAtual.innerText = `Setor: ${cidade.nome} - Área de Risco`;
+                }
+            } else if (!novoAlerta && cidade.alerta) {
+                cidade.alerta = false;
+                addLog(`🟢 ${cidade.nome} retornou à normalidade.`);
+                
+                // Verificar se outras cidades ainda estão em alerta
+                let algumaAlerta = false;
+                Object.keys(CIDADES).forEach(k => {
+                    if (CIDADES[k].alerta) algumaAlerta = true;
+                });
+                
+                if (!algumaAlerta) {
+                    isEmergency = false;
+                    cidadeEmAlerta = null;
+                    statusBanner.innerHTML = `<span>✅ STATUS: MONITORAMENTO NORMAL</span>`;
+                    statusBanner.className = "status-banner";
+                    btnDispatch.style.display = "none";
+                    btnFirms.className = "btn-firms";
+                    pararSirene();
+                }
+            }
+            
+            // Atualizar interface principal com dados da cidade em alerta ou da primeira ativa
+            const cidadeDisplay = cidadeEmAlerta ? CIDADES[cidadeEmAlerta] : cidade;
+            if (cidadeDisplay) {
+                valTemp.innerText = `${cidadeDisplay.temperatura.toFixed(1)} °C`;
+                valHum.innerText = `${(55 - (cidadeDisplay.temperatura - 28) * 1.5 + (Math.random() * 5)).toFixed(1)} %`;
+                valGas.innerText = `${cidadeDisplay.gas} PPM`;
+                valFlame.innerText = cidadeDisplay.chama ? "🔥 FOGO DETECTADO" : "✅ NENHUM";
+                
+                if (cidadeDisplay.chama) {
+                    valFlame.style.color = 'var(--accent-red)';
+                    document.getElementById('cardFlame').className = 'card alert-card';
+                } else {
+                    valFlame.style.color = 'var(--text-color)';
+                    document.getElementById('cardFlame').className = 'card';
+                }
+                
+                if (cidadeDisplay.alerta) {
+                    document.getElementById('cardTemp').className = 'card alert-card';
+                    document.getElementById('cardGas').className = 'card alert-card';
+                } else {
+                    document.getElementById('cardTemp').className = 'card';
+                    document.getElementById('cardGas').className = 'card';
+                }
+            }
+            
+            // Atualizar cards e badges
+            atualizarCardsCidades();
+            atualizarBadges();
+            
+            // Atualizar gráfico
+            if (graficoSensores) {
+                const now = new Date().toLocaleTimeString();
+                graficoSensores.data.labels.push(`${now} - ${cidade.nome}`);
+                graficoSensores.data.datasets[0].data.push(dados.temperatura);
+                graficoSensores.data.datasets[1].data.push(dados.gas);
+                
+                if (graficoSensores.data.labels.length > 30) {
+                    graficoSensores.data.labels.shift();
+                    graficoSensores.data.datasets[0].data.shift();
+                    graficoSensores.data.datasets[1].data.shift();
+                }
+                
+                graficoSensores.update();
+            }
+        }
+
+        // ============================================
+        // SIMULADOR PARA MÚLTIPLAS CIDADES
+        // ============================================
+        function iniciarSimulador() {
+            let step = 0;
+            
+            // Inicializar dados das cidades
+            Object.keys(CIDADES).forEach(key => {
+                const cidade = CIDADES[key];
+                cidade.temperatura = 28 + (Math.random() * 3);
+                cidade.gas = 120 + (Math.random() * 50);
+                cidade.chama = false;
+                cidade.alerta = false;
+                cidade.sensorAtivo = true;
+            });
+            
+            addLog("⏳ Aguardando pacotes de rádio...");
+            addLog(`📡 Limites: Temp ${CONFIG.TEMP_ALERTA}°C | Gás ${CONFIG.GAS_ALERTA}PPM`);
+            addLog('📍 Monitorando: Ibitinga, Araraquara e São Carlos');
+            
+            simulationInterval = setInterval(() => {
+                step++;
+                
+                // Cada cidade recebe dados simulados
+                Object.keys(CIDADES).forEach((key, index) => {
+                    const cidade = CIDADES[key];
+                    
+                    // Comportamento diferente para cada cidade
+                    let tempDelta = 0;
+                    let gasDelta = 0;
+                    let chama = false;
+                    
+                    if (key === 'ibitinga') {
+                        // Ibitinga: incêndio no ciclo 10-18
+                        if (step > 10 && step < 18) {
+                            tempDelta = Math.random() * 5 + 2;
+                            gasDelta = Math.random() * 100 + 50;
+                            chama = step > 12 && Math.random() > 0.5;
+                        } else if (step >= 18) {
+                            tempDelta = -Math.random() * 4;
+                            gasDelta = -Math.random() * 60;
+                        } else {
+                            tempDelta = Math.random() * 0.5 - 0.2;
+                            gasDelta = Math.random() * 10 - 5;
+                        }
+                    } else if (key === 'araraquara') {
+                        // Araraquara: incêndio no ciclo 14-22
+                        if (step > 14 && step < 22) {
+                            tempDelta = Math.random() * 6 + 3;
+                            gasDelta = Math.random() * 120 + 60;
+                            chama = step > 16 && Math.random() > 0.4;
+                        } else if (step >= 22) {
+                            tempDelta = -Math.random() * 5;
+                            gasDelta = -Math.random() * 70;
+                        } else {
+                            tempDelta = Math.random() * 0.5 - 0.2;
+                            gasDelta = Math.random() * 10 - 5;
+                        }
+                    } else if (key === 'saocarlos') {
+                        // São Carlos: incêndio no ciclo 18-26
+                        if (step > 18 && step < 26) {
+                            tempDelta = Math.random() * 7 + 4;
+                            gasDelta = Math.random() * 140 + 70;
+                            chama = step > 20 && Math.random() > 0.3;
+                        } else if (step >= 26) {
+                            tempDelta = -Math.random() * 6;
+                            gasDelta = -Math.random() * 80;
+                        } else {
+                            tempDelta = Math.random() * 0.5 - 0.2;
+                            gasDelta = Math.random() * 10 - 5;
+                        }
+                    }
+                    
+                    // Atualizar dados da cidade
+                    cidade.temperatura = Math.max(20, cidade.temperatura + tempDelta);
+                    cidade.gas = Math.max(80, cidade.gas + gasDelta);
+                    cidade.chama = chama;
+                    
+                    // Criar pacote simulado
+                    const pacote = {
+                        temperatura: cidade.temperatura,
+                        gas: Math.floor(cidade.gas),
+                        chamaDetectada: cidade.chama,
+                        lat: cidade.lat,
+                        lon: cidade.lon
+                    };
+                    
+                    // Processar dados
+                    processarDadosSensores(pacote, key);
+                    
+                    // Log
+                    const icon = cidade.chama ? '🔥' : '📦';
+                    addLog(`${icon} ${cidade.nome}: T:${cidade.temperatura.toFixed(1)}°C, GÁS:${cidade.gas}PPM`);
+                });
+                
+                // Resetar ciclo se todas voltaram ao normal
+                if (step > 30) {
+                    step = 0;
+                    addLog('🔄 Ciclo de simulação reiniciado');
+                }
+                
+            }, CONFIG.INTERVALO_ATUALIZACAO);
+        }
+
+        // ============================================
+        // BOTÃO DE DESPACHO
+        // ============================================
+        async function despacharViatura() {
+            const btn = document.getElementById('btnDispatch');
+            btn.disabled = true;
+            btn.textContent = '⏳ Enviando...';
+            
+            try {
+                let lat, lon, cidadeNome;
+                if (cidadeEmAlerta && CIDADES[cidadeEmAlerta]) {
+                    const cidade = CIDADES[cidadeEmAlerta];
+                    lat = cidade.lat;
+                    lon = cidade.lon;
+                    cidadeNome = cidade.nome;
+                } else {
+                    lat = '-21.7600';
+                    lon = '-48.8300';
+                    cidadeNome = 'Região';
+                }
+                
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                
+                addLog(`🚒 Viatura despachada para ${cidadeNome}!`);
+                alert(`✅ Viatura despachada para ${cidadeNome}! Abrindo rota no Google Maps...`);
+                
+                window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`, '_blank');
+            } catch (error) {
+                alert('❌ Erro ao despachar viatura. Tente novamente.');
+                console.error(error);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🚒 GERAR ROTA DE DESPACHO';
+            }
+        }
+
+        // ============================================
+        // GERAR RELATÓRIO
+        // ============================================
+        function gerarRelatorio() {
+            const logs = Array.from(document.querySelectorAll('.log-entry')).map(el => el.innerText);
+            
+            const relatorio = {
+                dataGeracao: new Date().toISOString(),
+                cidades: CIDADES,
+                statusGeral: statusBanner.innerText,
+                alertaAtivo: isEmergency,
+                cidadeEmAlerta: cidadeEmAlerta,
+                logs: logs.slice(0, 100)
+            };
+            
+            const blob = new Blob([JSON.stringify(relatorio, null, 2)], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `relatorio-incendio-${new Date().toISOString().slice(0,10)}.json`;
+            a.click();
+            
+            addLog('📊 Relatório gerado com sucesso');
+        }
+
+        // ============================================
+        // REINICIAR SIMULAÇÃO
+        // ============================================
+        function reiniciarSimulacao() {
+            if (simulationInterval) {
+                clearInterval(simulationInterval);
+            }
+            
+            pararSirene();
+            
+            isEmergency = false;
+            cidadeEmAlerta = null;
+            step = 0;
+            
+            Object.keys(CIDADES).forEach(key => {
+                const cidade = CIDADES[key];
+                cidade.temperatura = 28 + (Math.random() * 3);
+                cidade.gas = 120 + (Math.random() * 50);
+                cidade.chama = false;
+                cidade.alerta = false;
+            });
+            
+            statusBanner.innerHTML = `<span>✅ STATUS: MONITORAMENTO NORMAL</span>`;
+            statusBanner.className = "status-banner";
+            btnDispatch.style.display = "none";
+            btnFirms.className = "btn-firms";
+            
+            document.getElementById('cardTemp').className = 'card';
+            document.getElementById('cardGas').className = 'card';
+            document.getElementById('cardFlame').className = 'card';
+            
+            if (graficoSensores) {
+                graficoSensores.data.labels = [];
+                graficoSensores.data.datasets[0].data = [];
+                graficoSensores.data.datasets[1].data = [];
+                graficoSensores.update();
+            }
+            
+            atualizarCardsCidades();
+            atualizarBadges();
+            
+            addLog('🔄 Simulação reiniciada');
+            iniciarSimulador();
+        }
+
+        // ============================================
+        // INICIALIZAR GRÁFICO
+        // ============================================
+        function inicializarGrafico() {
+            const ctx = document.getElementById('graficoSensores').getContext('2d');
+            graficoSensores = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: '🌡️ Temperatura (°C)',
+                            data: [],
+                            borderColor: '#ff6384',
+                            backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                            tension: 0.4,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: '💨 Gás (PPM)',
+                            data: [],
+                            borderColor: '#36a2eb',
+                            backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                            tension: 0.4,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            position: 'left',
+                            title: { display: true, text: 'Temperatura (°C)', color: '#888' },
+                            grid: { color: 'rgba(255,255,255,0.1)' }
+                        },
+                        y1: {
+                            beginAtZero: true,
+                            position: 'right',
+                            grid: { drawOnChartArea: false },
+                            title: { display: true, text: 'Gás (PPM)', color: '#888' }
+                        },
+                        x: {
+                            ticks: { color: '#888', maxTicksLimit: 15, font: { size: 9 } }
+                        }
+                    },
+                    plugins: {
+                        legend: { 
+                            position: 'top',
+                            labels: { color: '#888' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // ============================================
+        // CONFIGURAÇÕES DO USUÁRIO
+        // ============================================
+        function salvarConfiguracoes() {
+            const tempAlerta = parseFloat(tempAlertaInput.value);
+            const gasAlerta = parseInt(gasAlertaInput.value);
+            
+            if (tempAlerta > 0 && tempAlerta < 100) {
+                CONFIG.TEMP_ALERTA = tempAlerta;
+                addLog(`✅ Temperatura de alerta ajustada para ${tempAlerta}°C`);
+            }
+            
+            if (gasAlerta > 0 && gasAlerta < 2000) {
+                CONFIG.GAS_ALERTA = gasAlerta;
+                addLog(`✅ Gás de alerta ajustado para ${gasAlerta}PPM`);
+            }
+            
+            localStorage.setItem('configIoT', JSON.stringify(CONFIG));
+        }
+
+        function carregarConfiguracoes() {
+            try {
+                const salvo = localStorage.getItem('configIoT');
+                if (salvo) {
+                    const config = JSON.parse(salvo);
+                    CONFIG.TEMP_ALERTA = config.TEMP_ALERTA || 45;
+                    CONFIG.GAS_ALERTA = config.GAS_ALERTA || 400;
+                    tempAlertaInput.value = CONFIG.TEMP_ALERTA;
+                    gasAlertaInput.value = CONFIG.GAS_ALERTA;
+                }
+            } catch (e) {
+                console.error('Erro ao carregar configurações:', e);
+            }
+        }
+
+        // ============================================
+        // INICIALIZAÇÃO
+        // ============================================
+        window.onload = function() {
+            carregarConfiguracoes();
+            inicializarGrafico();
+            atualizarCardsCidades();
+            atualizarBadges();
+            
+            if ("Notification" in window && Notification.permission === 'default') {
+                Notification.requestPermission();
+            }
+            
+            iniciarSimulador();
+            
+            addLog('🚀 Sistema iniciado com sucesso!');
+            addLog('📍 Monitorando: Ibitinga, Araraquara e São Carlos');
+            addLog(`📊 Limites: Temp ${CONFIG.TEMP_ALERTA}°C | Gás ${CONFIG.GAS_ALERTA}PPM`);
+            addLog('🔊 Alerta sonoro ativado');
+        };
+
+        window.onbeforeunload = function() {
+            pararSirene();
+            if (simulationInterval) {
+                clearInterval(simulationInterval);
+            }
+        };
+    </script>
+</body>
+</html>
